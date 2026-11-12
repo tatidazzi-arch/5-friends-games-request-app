@@ -1,0 +1,13 @@
+# Banco de dados com senhas — NUNCA versionar
+data/
+
+# Node
+node_modules/
+npm-debug.log*
+*.log
+
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

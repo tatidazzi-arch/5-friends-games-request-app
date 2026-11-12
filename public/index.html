@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Acesso</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>" />
+  </head>
+  <body>
+    <main id="app" class="app">
+      <!-- ===================== LOGIN ===================== -->
+      <section id="viewLogin" class="view">
+        <div class="card">
+          <div class="logo">🔐</div>
+          <h1>Acesso</h1>
+          <p class="sub" id="loginSub">Entre com seu usuário e senha</p>
+
+          <form id="loginForm" autocomplete="on">
+            <label for="loginUser">Usuário</label>
+            <input id="loginUser" name="username" type="text" required autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="seu usuário" />
+
+            <label for="loginPass">Senha</label>
+            <div class="passwrap">
+              <input id="loginPass" name="password" type="password" required autocomplete="current-password" placeholder="sua senha" />
+              <button type="button" class="eye" data-toggle="loginPass" aria-label="mostrar senha">👁</button>
+            </div>
+
+            <div class="error" id="loginError" role="alert" hidden></div>
+            <button class="btn primary" type="submit" id="loginBtn">ENTRAR</button>
+          </form>
+
+          <div class="setup" id="setupBox" hidden>
+            <hr />
+            <h2>Primeiro acesso</h2>
+            <p class="sub">Crie a conta do dono (é ela que gerencia as demais).</p>
+            <form id="setupForm">
+              <label for="setupName">Seu nome</label>
+              <input id="setupName" type="text" value="Miguel Franklin Dazzi" autocomplete="name" />
+              <label for="setupUser">Usuário do dono</label>
+              <input id="setupUser" type="text" value="dono" required autocomplete="username" autocapitalize="off" spellcheck="false" />
+              <label for="setupPass">Senha do dono</label>
+              <div class="passwrap">
+                <input id="setupPass" type="password" required autocomplete="new-password" minlength="6" placeholder="mínimo 6 caracteres" />
+                <button type="button" class="eye" data-toggle="setupPass" aria-label="mostrar senha">👁</button>
+              </div>
+              <div class="error" id="setupError" role="alert" hidden></div>
+              <button class="btn primary" type="submit">CRIAR DONO</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PAINEL ===================== -->
+      <section id="viewPanel" class="view" hidden>
+        <header class="topbar">
+          <div class="brand">🔐 <b>Painel de acesso</b></div>
+          <div class="topright">
+            <span class="who" id="whoami"></span>
+            <a class="btn ghost small" id="gameLink" href="/jogo/" hidden>🎮 Abrir o jogo</a>
+            <button class="btn ghost small" id="logoutBtn">Sair</button>
+          </div>
+        </header>
+
+        <div class="panels">
+          <!-- ---- dono ---- -->
+          <div class="panel" id="adminPanel" hidden>
+            <h2>Contas de acesso</h2>
+            <p class="sub">Crie um usuário + senha para cada pessoa e mande no WhatsApp. Eles entram em <code>/login</code>.</p>
+
+            <form id="createForm" class="create">
+              <div class="grid">
+                <div>
+                  <label for="newUser">Usuário</label>
+                  <input id="newUser" type="text" required placeholder="ex.: joao" autocapitalize="off" spellcheck="false" pattern="[a-z0-9._\-]{2,32}" />
+                </div>
+                <div>
+                  <label for="newName">Nome (opcional)</label>
+                  <input id="newName" type="text" placeholder="João Souza" />
+                </div>
+                <div>
+                  <label for="newPass">Senha</label>
+                  <div class="passwrap">
+                    <input id="newPass" type="text" placeholder="gerada automático" autocomplete="off" />
+                    <button type="button" class="eye" id="genPass" title="gerar senha">🎲</button>
+                  </div>
+                </div>
+                <div>
+                  <label for="newDays">Validade (dias)</label>
+                  <input id="newDays" type="number" min="0" placeholder="0 = sem prazo" />
+                </div>
+              </div>
+              <div class="row">
+                <label class="check"><input type="checkbox" id="newAdmin" /> <span>pode gerenciar contas</span></label>
+                <label class="check"><input type="checkbox" id="newMustChange" checked /> <span>pedir nova senha no 1º acesso</span></label>
+              </div>
+              <div class="error" id="createError" role="alert" hidden></div>
+              <button class="btn primary" type="submit">+ CRIAR CONTA</button>
+            </form>
+
+            <div id="createdList" class="created"></div>
+
+            <h3>Contas existentes</h3>
+            <div class="tablewrap">
+              <table id="usersTable">
+                <thead>
+                  <tr><th>Usuário</th><th>Nome</th><th>Criada</th><th>Último acesso</th><th>Status</th><th>Ações</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <details class="logbox">
+              <summary>Histórico</summary>
+              <ul id="auditList"></ul>
+            </details>
+          </div>
+
+          <!-- ---- usuário comum ---- -->
+          <div class="panel" id="userPanel" hidden>
+            <h2>Bem-vindo, <span id="userName"></span> 👋</h2>
+            <p class="sub">Seu acesso está liberado. Use o botão acima para abrir o jogo.</p>
+            <div class="userinfo" id="userInfo"></div>
+          </div>
+
+          <!-- ---- minha senha (todos) ---- -->
+          <div class="panel" id="passPanel">
+            <h2>Trocar minha senha</h2>
+            <form id="passForm">
+              <label for="curPass">Senha atual</label>
+              <input id="curPass" type="password" required autocomplete="current-password" />
+              <label for="newPass2">Nova senha</label>
+              <input id="newPass2" type="password" required minlength="6" autocomplete="new-password" />
+              <label for="newPass2b">Repetir a nova senha</label>
+              <input id="newPass2b" type="password" required minlength="6" autocomplete="new-password" />
+              <div class="error" id="passError" role="alert" hidden></div>
+              <button class="btn primary" type="submit">SALVAR</button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

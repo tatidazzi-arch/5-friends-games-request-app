@@ -1,0 +1,22 @@
+{
+  "name": "5-friends-games-request-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Portal de acesso: senha mestra do dono + contas de acesso para os amigos",
+  "type": "module",
+  "main": "server.mjs",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "keywords": [
+    "login",
+    "acesso",
+    "senha",
+    "portal"
+  ],
+  "license": "MIT"
+}
