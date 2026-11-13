@@ -12,6 +12,7 @@
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
     "test": "node test/local-sim.mjs && node test/vercel-sim.mjs && node test/pg-adapter.mjs && node test/vercel-env.mjs && node test/bundle-check.mjs",
+    "check:deploy": "node verificar-deploy.mjs",
     "vercel:dev": "vercel dev",
     "deploy": "vercel deploy --prod"
   },
