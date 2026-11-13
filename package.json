@@ -10,7 +10,13 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "dev": "node --watch server.mjs"
+    "dev": "node --watch server.mjs",
+    "test": "node test/local-sim.mjs && node test/vercel-sim.mjs && node test/pg-adapter.mjs && node test/bundle-check.mjs",
+    "vercel:dev": "vercel dev",
+    "deploy": "vercel deploy --prod"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
   },
   "keywords": [
     "login",

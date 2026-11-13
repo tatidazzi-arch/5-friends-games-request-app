@@ -3,39 +3,89 @@
 Site de login com **senha mestra do dono**: o dono entra, cria contas
 (nome de usuário + senha) para outras pessoas e elas entram com essas credenciais.
 
-Sem dependências externas — só Node (módulos nativos + `node:sqlite`).
+Roda na **Vercel** (com Postgres) ou localmente (com SQLite, sem dependências).
 
 ```
-server.mjs        servidor HTTP + API
-lib/db.mjs        banco SQLite (usuários, sessões, tentativas, histórico)
+server.mjs        servidor HTTP local (node server.mjs)
+api/index.js      função serverless da Vercel
+lib/app.mjs       núcleo do app: rotas + regras de acesso (compartilhado)
+lib/db.mjs        banco: SQLite (local) ou Postgres (Vercel) — mesma API
 lib/auth.mjs      hash scrypt, sessões em cookie, trava anti-força bruta
 lib/http.mjs      JSON, cookies, arquivos estáticos
 public/           tela de login + painel do dono (HTML/CSS/JS puro)
-data/             banco de dados (criado no 1º start, fora do git)
+test/             testes automatizados (local, serverless e adapter Postgres)
+data/             banco SQLite local (criado no 1º start, fora do git)
 ```
 
-## Rodar
+## Rodar localmente
 
 ```bash
+npm install       # instala o "pg" (só é usado se houver POSTGRES_URL)
 npm start
 # http://localhost:3000
 ```
 
-Requer **Node 22.5+** (usa o `node:sqlite` nativo). Não precisa de `npm install` —
-o projeto não tem dependências.
-
-Variáveis de ambiente (todas opcionais):
+Sem `POSTGRES_URL` o app usa **SQLite** (arquivo em `data/acesso.db`) e não
+precisa de nenhum servidor de banco.
 
 | Var | Padrão | O que faz |
 |---|---|---|
 | `PORT` | `3000` | porta do servidor |
 | `HOST` | `0.0.0.0` | interface de rede |
-| `DATA_DIR` | `./data` | onde fica o banco |
+| `DATA_DIR` | `./data` | onde fica o banco SQLite |
+| `POSTGRES_URL` | — | se definir, usa Postgres em vez de SQLite |
+| `DATABASE_URL` | — | alias do POSTGRES_URL |
 | `SESSION_DAYS` | `7` | validade da sessão |
 | `MAX_LOGIN_FAILS` | `5` | erros de login até bloquear |
 | `LOCK_MINUTES` | `10` | tempo de bloqueio |
-| `SECURE_COOKIE` | `0` | `1` = cookie só em https (produção) |
+| `SECURE_COOKIE` | `0` | `1` = cookie só em https |
 | `GAME_DIST` | `./dist` | pasta do build do jogo (opcional) |
+
+## Publicar na Vercel
+
+### 1. Banco de dados
+
+A Vercel é serverless: não tem disco fixo, então o SQLite **não funciona lá**.
+Crie um Postgres (a Vercel tem o **Vercel Postgres**/Neon integrado):
+
+- Dashboard da Vercel → **Storage** → **Create Database** → Neon/Postgres
+- Copie a connection string (`postgres://...`)
+
+### 2. Variáveis de ambiente
+
+No projeto na Vercel → **Settings** → **Environment Variables**:
+
+| Nome | Valor |
+|---|---|
+| `POSTGRES_URL` | a connection string do Postgres |
+| `SESSION_DAYS` | `7` (opcional) |
+
+### 3. Deploy
+
+```bash
+npm install -g vercel
+vercel link          # conecta ao projeto
+vercel deploy --prod
+```
+
+O `vercel.json` já está pronto: a função em `api/index.js` atende a API, a
+tela de login e o jogo protegido, e o `public/` é servido como estático.
+
+### Como o roteamento funciona
+
+A Vercel reescreve a URL antes de chamar a função, então o `req.url` não é
+confiável. Por isso o `vercel.json` manda o caminho original em `?__path=`
+e a função usa esse valor:
+
+```json
+{ "source": "/api/(.*)", "destination": "/api/index?__path=/api/$1" }
+```
+
+### Testar o deploy antes de subir
+
+```bash
+vercel dev           # sobe localmente com o mesmo roteamento da Vercel
+```
 
 ## Como se usa
 
@@ -57,7 +107,8 @@ Variáveis de ambiente (todas opcionais):
   alheias (a API responde 403).
 - **Senha gerada**: deixe o campo vazio e o sistema cria uma senha legível (sem 0/O, 1/l).
 - **Validade**: a conta expira sozinha depois de N dias.
-- **Pedir troca de senha**: o convidado é obrigado a criar uma senha nova no 1º acesso.
+- **Pedir troca de senha**: por padrão o convidado é obrigado a criar uma senha
+  nova no 1º acesso (dá para desligar na criação da conta).
 - **Desativar**: a conta é bloqueada na hora e as sessões abertas caem.
 - **Resetar senha**: gera uma senha nova e derruba as sessões do usuário.
 - **Histórico**: quem entrou, quando, e o que o dono fez.
@@ -68,20 +119,27 @@ Variáveis de ambiente (todas opcionais):
   e comparação em tempo constante (`timingSafeEqual`).
 - A senha do usuário só aparece em texto puro no momento da criação/reset — nunca
   é retornada depois (o servidor só tem o hash).
-- Sessão em cookie `HttpOnly` + `SameSite=Lax`, com expiração.
+- Sessão em cookie `HttpOnly` + `SameSite=Lax` (+ `Secure` no deploy), com expiração.
 - Trava anti-força bruta por usuário+IP (5 erros → 10 min bloqueado).
 - Caminhos de arquivo bloqueados contra *path traversal*.
 - O `data/` (com o banco e as senhas) está fora do git.
 
-## Publicar na internet
+## Testes
 
-O portal precisa de **disco persistente** (o banco é um arquivo SQLite), então
-não roda como serverless da Vercel. Opções:
+```bash
+npm test
+```
 
-- **Servidor próprio / VPS** (recomendado): `npm start` atrás de nginx/Caddy com
-  TLS e `SECURE_COOKIE=1`.
-- **Railway / Render / Fly.io** com disco montado.
-- **Vercel**: funciona se trocar o SQLite por um Postgres/Vercel KV e adaptar
-  `lib/db.mjs` (as queries já estão isoladas lá).
+- `test/local-sim.mjs` — servidor local com SQLite (fluxo completo do dono e convidado)
+- `test/vercel-sim.mjs` — função serverless simulada (body parseado, URL reescrita, cookie Secure)
+- `test/pg-adapter.mjs` — adapter Postgres (conversão de SQL, `RETURNING id`, `ON CONFLICT`)
 
-Backup do banco: copie o arquivo `data/acesso.db` (é um SQLite comum).
+## Publicar fora da Vercel
+
+O app também roda em qualquer Node com disco (VPS, Railway, Render, Fly.io):
+
+```bash
+npm start
+```
+
+Backup do banco local: copie `data/acesso.db`. No Postgres, use `pg_dump`.

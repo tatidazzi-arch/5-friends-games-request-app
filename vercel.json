@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 30,
+      "includeFiles": ["public/**"]
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index?__path=/api/$1" },
+    { "source": "/login", "destination": "/api/index?__path=/login" },
+    { "source": "/login/", "destination": "/api/index?__path=/login" },
+    { "source": "/jogo", "destination": "/api/index?__path=/jogo" },
+    { "source": "/jogo/(.*)", "destination": "/api/index?__path=/jogo/$1" },
+    { "source": "/(.*)", "destination": "/api/index?__path=/$1" }
+  ]
+}

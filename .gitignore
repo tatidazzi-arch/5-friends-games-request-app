@@ -6,6 +6,9 @@ node_modules/
 npm-debug.log*
 *.log
 
+# Vercel
+.vercel
+
 # Sistema operacional / editor
 .DS_Store
 Thumbs.db
