@@ -13,7 +13,7 @@ lib/db.mjs        banco: SQLite (local) ou Postgres (Vercel) — mesma API
 lib/auth.mjs      hash scrypt, sessões em cookie, trava anti-força bruta
 lib/http.mjs      JSON, cookies, arquivos estáticos
 public/           tela de login + painel do dono (HTML/CSS/JS puro)
-test/             testes automatizados (local, serverless e adapter Postgres)
+test/             testes automatizados (local, serverless, Postgres e bundle)
 data/             banco SQLite local (criado no 1º start, fora do git)
 ```
 
@@ -60,6 +60,27 @@ No projeto na Vercel → **Settings** → **Environment Variables**:
 | `POSTGRES_URL` | a connection string do Postgres |
 | `SESSION_DAYS` | `7` (opcional) |
 
+> **A `POSTGRES_URL` é obrigatória na Vercel.** Sem ela o app até abre, mas usa um
+> banco temporário em `/tmp`: as contas somem sempre que a função reinicia
+> (a Vercel reinicia funções o tempo todo). A tela mostra um aviso amarelo
+> quando isso acontece.
+
+### 2b. Conferindo se está tudo certo
+
+Depois do deploy, abra:
+
+```
+https://SEU-PROJETO.vercel.app/api/health
+```
+
+A resposta mostra o backend em uso, se a `POSTGRES_URL` foi lida e a versão do
+Node. Se der `503`, o campo `detalhe` diz exatamente o que falhou.
+
+### 2c. Se aparecer "500 FUNCTION_INVOCATION_FAILED"
+
+Quase sempre é a `POSTGRES_URL` (ausente, com senha errada ou banco dormindo).
+Veja a seção **Troubleshooting** abaixo. |
+
 ### 3. Deploy
 
 ```bash
@@ -87,7 +108,42 @@ e a função usa esse valor:
 vercel dev           # sobe localmente com o mesmo roteamento da Vercel
 ```
 
-## Como se usa
+## Troubleshooting
+
+### "500 FUNCTION_INVOCATION_FAILED"
+
+A função não conseguiu iniciar. Descubra o motivo em `/api/health` (ela responde
+mesmo quando o banco falha) ou nos **logs** do deploy na Vercel.
+
+Causas, da mais comum para a menos:
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| `temPostgresUrl: false` | faltou a variável de ambiente | crie `POSTGRES_URL` em Settings → Environment Variables e redeploy |
+| `column "id" does not exist` | banco com schema antigo | já corrigido nesta versão; redeploy |
+| `password authentication failed` | senha da URL errada | recrie a connection string no painel do banco |
+| `ECONNREFUSED` / `timeout` | banco dormendo ou inacessível | "wake" no painel (Neon/Vercel Postgres) e redeploy |
+| `pg não está instalado` | dependência faltando | `npm install` e redeploy (a Vercel instala sozinha pelo `package.json`) |
+
+### A tela pede login e não entra
+
+Duas causas diferentes:
+
+1. **"This page is unavailable"** → a função quebrou. Veja acima.
+2. **Página de login da Vercel** → o projeto tem **Deployment Protection**
+   ligado. Desligue em **Settings → Deployment Protection → Vercel
+   Authentication** (ou coloque em "Only Preview"). Sem isso, quem não estiver
+   logado na Vercel não consegue acessar o site — inclusive os seus amigos.
+
+### As contas somem do nada
+
+Sinal de que está rodando com o banco temporário (sem `POSTGRES_URL`).
+Configure o Postgres — a tela de login mostra um aviso amarelo nesse caso.
+
+### O deploy não(build) falha
+
+Confira se o `package.json` tem `"type": "module"` e se `api/index.js` está
+na raiz. O `vercel.json` não deve ter `buildCommand` (não há build).
 
 1. **Primeiro acesso**: o navegador mostra "crie a conta do dono" (seu nome,
    usuário `dono`, senha 6+ caracteres). Isso só acontece uma vez — o banco
@@ -133,6 +189,8 @@ npm test
 - `test/local-sim.mjs` — servidor local com SQLite (fluxo completo do dono e convidado)
 - `test/vercel-sim.mjs` — função serverless simulada (body parseado, URL reescrita, cookie Secure)
 - `test/pg-adapter.mjs` — adapter Postgres (conversão de SQL, `RETURNING id`, `ON CONFLICT`)
+- `test/vercel-env.mjs` — disco read-only (fallback pro /tmp), Postgres fora do ar, `/api/health`
+- `test/bundle-check.mjs` — confere se o bundle da função tem tudo que ela importa
 
 ## Publicar fora da Vercel
 

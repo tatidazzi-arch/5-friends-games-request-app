@@ -10,6 +10,11 @@
   </head>
   <body>
     <main id="app" class="app">
+      <!-- aviso de banco temporário (Vercel sem POSTGRES_URL) -->
+      <div class="banner" id="warnBanner" hidden>
+        <b>⚠️ Atenção:</b> <span id="warnText"></span>
+      </div>
+
       <!-- ===================== LOGIN ===================== -->
       <section id="viewLogin" class="view">
         <div class="card">

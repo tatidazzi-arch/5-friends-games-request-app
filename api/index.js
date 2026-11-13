@@ -43,17 +43,57 @@ function getApp() {
   return appPromise;
 }
 
-export default async function handler(req, res) {
-  const app = await getApp();
+/**
+ * Diagnóstico: mostra o que a função está usando (backend, env, etc).
+ * Helps a descobrir por que o deploy está dando 500 sem precisar dos logs.
+ */
+function diagnose(req, res) {
+  const hasPg = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
+  const body = {
+    ok: true,
+    node: process.version,
+    temPostgresUrl: hasPg,
+    backend: hasPg ? 'postgres' : 'sqlite',
+    aviso: hasPg
+      ? null
+      : 'POSTGRES_URL não está definido: os dados NÃO serão salvos de verdade ' +
+        '(a Vercel não tem disco fixo). Configure a variável de ambiente.',
+    env: {
+      VERCEL: process.env.VERCEL ?? null,
+      VERCEL_ENV: process.env.VERCEL_ENV ?? null,
+      NODE_ENV: process.env.NODE_ENV ?? null,
+      SESSION_DAYS: process.env.SESSION_DAYS ?? null,
+    },
+    path: req.query?.__path ?? req.url,
+  };
+  res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(JSON.stringify(body));
+}
 
-  // caminho original (enviado pelo rewrite) ou o que sobrou na URL
+export default async function handler(req, res) {
   const original = req.query?.__path;
   const pathname = typeof original === 'string' && original ? original : null;
 
-  return app.handler(req, res, pathname);
-}
+  // diagnóstico: não precisa de banco, então responde mesmo se o banco falhar
+  if (pathname === '/api/health' || pathname === '/api/diagnostico') {
+    return diagnose(req, res);
+  }
 
-// a Vercel usa a raiz do projeto como cwd em alguns casos
-if (!fs.existsSync(PUBLIC_DIR)) {
-  console.warn(`[aviso] public/ não encontrado em ${PUBLIC_DIR}`);
+  try {
+    const app = await getApp();
+    return await app.handler(req, res, pathname);
+  } catch (err) {
+    // erro na inicialização (banco indisponível, etc): responde com o motivo
+    // em vez de deixar a Vercel mostrar um 500 genérico sem informação
+    console.error('[falha ao iniciar]', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({
+      error: 'O portal não conseguiu iniciar.',
+      detalhe: msg,
+      dica: process.env.POSTGRES_URL || process.env.DATABASE_URL
+        ? 'Verifique a variável POSTGRES_URL e se o banco está acessível.'
+        : 'Configure a variável de ambiente POSTGRES_URL (Postgres) no projeto da Vercel.',
+    }));
+  }
 }

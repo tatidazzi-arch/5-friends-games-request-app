@@ -25,6 +25,18 @@ body {
 
 .app { min-height: 100%; display: flex; flex-direction: column; }
 
+/* ---------------- avisos ---------------- */
+.banner {
+  background: rgba(255, 170, 0, .14);
+  border-bottom: 1px solid rgba(255, 170, 0, .45);
+  color: #ffd88a;
+  padding: 10px 16px;
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.5;
+}
+.banner b { color: #ffc44d; }
+
 /* ---------------- login ---------------- */
 .view { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .card {

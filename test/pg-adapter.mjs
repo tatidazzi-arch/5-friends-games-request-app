@@ -11,6 +11,7 @@
  */
 import assert from 'node:assert';
 import { toPgPlaceholders, createPgStore } from '../lib/db.mjs';
+import { Auth, hashPassword, verifyPassword, generatePassword } from '../lib/auth.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -47,6 +48,16 @@ const attempts = new Map();
 const fakePool = {
   async query(sql, params = []) {
     log.push({ sql, params });
+
+    // simula o Postgres: "RETURNING id" numa tabela sem coluna id = erro
+    if (/RETURNING\s+id/i.test(sql)) {
+      const t = (sql.match(/INSERT\s+INTO\s+([a-z_]+)/i) || [])[1]?.toLowerCase();
+      if (t === 'sessions' || t === 'attempts') {
+        const err = new Error(`column "id" does not exist`);
+        err.code = '42703';
+        throw err;
+      }
+    }
 
     // --- attempts ---
     if (/INSERT INTO attempts/i.test(sql)) {
@@ -123,6 +134,24 @@ await store.prepare('UPDATE users SET disabled = ? WHERE id = ?').run(1, 3);
 check('UPDATE sem RETURNING', !log[0].sql.includes('RETURNING'), log[0].sql);
 check('UPDATE com $1/$2', log[0].sql.includes('$1') && log[0].sql.includes('$2'), log[0].sql);
 
+// --- BUG QUE CAUSAVA 500 EM TODO LOGIN NO POSTGRES ---
+// A tabela "sessions" tem "token" como PK: NÃO tem coluna "id".
+// Se o INSERT ganhasse "RETURNING id", o Postgres responderia
+// "column id does not exist" e o login quebraria na Vercel.
+log.length = 0;
+await store
+  .prepare('INSERT INTO sessions (token, user_id, created_at, expires_at, ip, user_agent) VALUES (?,?,?,?,?,?)')
+  .run('tok', 1, '2026-01-01', '2026-01-08', '1.1.1.1', 'ua');
+check('INSERT em sessions NÃO tem RETURNING (sessions não tem id)',
+  !log[0].sql.includes('RETURNING'), log[0].sql);
+check('INSERT em sessions tem 6 placeholders', /VALUES \(\$1,\$2,\$3,\$4,\$5,\$6\)/.test(log[0].sql), log[0].sql);
+
+// a tabela "audit" tem id: pode usar RETURNING
+log.length = 0;
+await store.prepare('INSERT INTO audit (at, actor, action, detail) VALUES (?,?,?,?)')
+  .run('2026-01-01', 'dono', 'login_ok', 'ip');
+check('INSERT em audit tem RETURNING id', log[0].sql.includes('RETURNING id'), log[0].sql);
+
 log.length = 0;
 await store.prepare('SELECT * FROM users WHERE username = ?').get('dono');
 check('SELECT com $1', log[0].sql.includes('$1'), log[0].sql);
@@ -132,10 +161,69 @@ check('get devolve undefined sem linhas', (await store.prepare('SELECT 1 WHERE f
 console.log('');
 console.log('  (app completo por cima do store Postgres)');
 
+/**
+ * Simula a Vercel: Postgres configurado, sessão criada e login feito.
+ * É o caminho que estava quebrado (RETURNING id em sessions).
+ */
+{
+  const sessions = new Map();
+  const users = new Map([['dono', { id: 1, username: 'dono', pw_hash: 'x', disabled: 0 }]]);
+
+  const simPool = {
+    async query(sql, params = []) {
+      if (/RETURNING\s+id/i.test(sql)) {
+        const t = (sql.match(/INSERT\s+INTO\s+([a-z_]+)/i) || [])[1]?.toLowerCase();
+        if (t !== 'users' && t !== 'audit') {
+          const e = new Error(`column "id" does not exist`);
+          e.code = '42703';
+          throw e;
+        }
+      }
+      if (/INSERT INTO sessions/i.test(sql)) {
+        sessions.set(params[0], { user_id: params[1], expires_at: params[3] });
+        return { rowCount: 1, rows: [] };
+      }
+      if (/FROM\s+sessions\s+s\s+JOIN/i.test(sql)) {
+        const s = sessions.get(params[0]);
+        if (!s) return { rowCount: 0, rows: [] };
+        const u = users.get('dono');
+        return { rowCount: 1, rows: [{ ...u, expires_at: s.expires_at }] };
+      }
+      if (/SELECT \* FROM users WHERE username/i.test(sql)) {
+        const u = users.get(params[0]);
+        return { rowCount: 1, rows: u ? [u] : [] };
+      }
+      if (/COUNT\(\*\)/i.test(sql)) return { rowCount: 1, rows: [{ n: 1 }] };
+      if (/^\s*SELECT/i.test(sql)) return { rowCount: 0, rows: [] };
+      return { rowCount: 1, rows: [] };
+    },
+    async end() {},
+  };
+
+  const simStore = createPgStore(simPool);
+  const simAuth = new Auth(simStore, { sessionDays: 7, maxFails: 5, lockMinutes: 10 });
+
+  // login cria sessão (era aqui que estourava o erro do RETURNING id)
+  let erro = null;
+  let token = null;
+  try {
+    const s = await simAuth.createSession(1, '1.1.1.1', 'ua');
+    token = s.token;
+  } catch (e) {
+    erro = e;
+  }
+  check('criar sessão no Postgres não estoura', erro === null, erro?.message);
+  check('sessão tem token', typeof token === 'string' && token.length > 20);
+
+  // e o token recupera o usuário
+  const achado = await simAuth.userFromToken(token);
+  check('token recupera o usuário', achado?.username === 'dono', JSON.stringify(achado));
+}
+
+console.log('');
+
 // monkey-patch: openDb precisa devolver o store falso.
 // como o app importa openDb direto, testamos as funções que mais importam.
-const { Auth, hashPassword, verifyPassword, generatePassword } = await import('../lib/auth.mjs');
-
 const auth = new Auth(store, { sessionDays: 7, maxFails: 5, lockMinutes: 10 });
 const hash = await hashPassword('senha123');
 check('hash no formato scrypt$sal$hash', hash.startsWith('scrypt$') && hash.split('$').length === 3, hash.slice(0, 20));

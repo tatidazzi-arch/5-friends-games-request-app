@@ -68,14 +68,25 @@ async function boot() {
   try {
     const s = await api('/api/state');
     state.hasGame = s.hasGame;
+    if (s.ephemeral) {
+      // Vercel sem POSTGRES_URL: os dados somem a cada reinício da função
+      $('warnBanner').hidden = false;
+      $('warnText').textContent =
+        'Este deploy está usando um banco temporário: as contas somem quando o servidor reinicia. ' +
+        'Configure a variável de ambiente POSTGRES_URL na Vercel para guardar tudo de verdade.';
+    }
     if (s.needsSetup) {
       $('setupBox').hidden = false;
       $('loginSub').textContent = 'Configure o acesso do dono para começar';
       $('loginForm').hidden = true;
     }
     if (s.user) showPanel(s.user);
-  } catch {
-    /* servidor fora do ar */
+  } catch (err) {
+    // banco fora do ar / função quebrada: mostra o motivo em vez de tela em branco
+    $('warnBanner').hidden = false;
+    $('warnBanner').style.background = 'rgba(255,92,92,.14)';
+    $('warnBanner').style.borderColor = 'rgba(255,92,92,.45)';
+    $('warnText').textContent = `O portal não está funcionando: ${err.message}`;
   }
   wire();
 }
