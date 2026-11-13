@@ -73,7 +73,7 @@ console.log('');
 console.log('  (endpoint de diagnóstico)');
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-health-'));
 process.env.DATA_DIR = DATA_DIR;
-const { default: handler } = await import('../api/index.js');
+const { default: handler } = await import('../api/index.mjs');
 
 function fakeRes() {
   return {

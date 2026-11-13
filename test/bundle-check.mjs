@@ -1,7 +1,7 @@
 /**
  * Verifica se a função da Vercel tem tudo que ela precisa no bundle.
  *
- * A Vercel empacota a função em api/index.js + os arquivos em includeFiles.
+ * A Vercel empacota a função em api/index.mjs + os arquivos em includeFiles.
  * Se faltar algum import (lib/, public/), o deploy quebra em produção.
  *
  * Roda: node test/bundle-check.mjs
@@ -22,9 +22,10 @@ function check(nome, cond, extra = '') {
 
 console.log('\n=== conferência do bundle da função ===\n');
 
-// 1. api/index.js existe
-const apiFile = path.join(ROOT, 'api', 'index.js');
-check('api/index.js existe', fs.existsSync(apiFile));
+// 1. api/index.mjs existe (.mjs é obrigatório: a Vercel compila .js para CJS
+//    e import.meta.url quebra a função no boot)
+const apiFile = path.join(ROOT, 'api', 'index.mjs');
+check('api/index.mjs existe', fs.existsSync(apiFile));
 check('exporta handler default', /export\s+default/.test(fs.readFileSync(apiFile, 'utf8')));
 
 // 2. todo import relativo existe
@@ -48,8 +49,8 @@ for (const f of fs.readdirSync(path.join(ROOT, 'lib'))) {
 
 // 4. public/ precisa estar no includeFiles do vercel.json
 const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
-const fn = vercel.functions?.['api/index.js'] ?? {};
-check('vercel.json tem functions api/index.js', !!fn);
+const fn = vercel.functions?.['api/index.mjs'] ?? {};
+check('vercel.json tem functions api/index.mjs', !!fn);
 // o build da Vercel exige includeFiles como STRING (array quebra o deploy)
 check('includeFiles inclui public/**',
   typeof fn.includeFiles === 'string' && fn.includeFiles.includes('public'),
@@ -111,7 +112,7 @@ check('sem senha hardcoded no frontend', suspicious.length === 0, suspicious.joi
 // 10. a função da Vercel precisa EXPORTA um handler
 //     (se a Vercel rodar server.mjs como função, não há handler e dá 500)
 const apiSrc = fs.readFileSync(apiFile, 'utf8');
-check('api/index.js exporta handler default',
+check('api/index.mjs exporta handler default',
   /export\s+default\s+(async\s+)?function/.test(apiSrc) || /export\s+default\s+\w+/.test(apiSrc));
 
 // 11. server.mjs NÃO pode exportar handler (é o servidor local)
@@ -121,9 +122,9 @@ check('server.mjs não exporta handler (evita confusão de entrypoint)',
 check('server.mjs abre servidor HTTP', serverSrc.includes('server.listen'));
 
 // 12. simula o build da Vercel: qual arquivo vira a função?
-//     A Vercel usa api/index.js se a pasta api/ existir.
-const temApi = fs.existsSync(path.join(ROOT, 'api', 'index.js'));
-check('pasta api/ existe (a Vercel cria a função a partir dela)', temApi);
+//     A Vercel usa api/index.mjs se a pasta api/ existir.
+const temApi = fs.existsSync(path.join(ROOT, 'api', 'index.mjs'));
+check('pasta api/ tem index.mjs (a Vercel cria a função a partir dela)', temApi);
 if (temPkg) {
   check('a função não depende de "main" do package.json', pkg.main === undefined);
 }

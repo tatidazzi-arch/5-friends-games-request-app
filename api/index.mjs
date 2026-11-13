@@ -16,10 +16,15 @@
  */
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { createApp } from '../lib/app.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// ATENÇÃO: este arquivo é .mjs de propósito.
+// A Vercel compila arquivos .js para CommonJS, e em CommonJS não existe
+// import.meta.url — usar isso no topo do arquivo quebra a função no boot
+// (FUNCTION_INVOCATION_FAILED, sem log). Com .mjs a Vercel mantém o ESM.
+//
+// Nem por isso usamos import.meta aqui: process.cwd() é mais simples e
+// funciona igual nos dois formatos de bundle.
 
 /**
  * Acha a pasta public/ onde o arquivo estiver.
@@ -30,11 +35,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * a camada estática da Vercel serve o index.html em "/".
  */
 function resolvePublicDir() {
+  const cwd = process.cwd();
   const candidates = [
-    path.join(__dirname, '..', 'public'), // layout do repositório (dev)
-    path.join(process.cwd(), 'public'), // cwd da Vercel
-    path.join(__dirname, 'public'), // public dentro do bundle
-    path.join(process.cwd(), '..', 'public'),
+    path.join(cwd, 'public'), // cwd da Vercel (o bundle roda aqui)
+    path.join(cwd, '..', 'public'),
+    path.join(cwd, '..', '..', 'public'),
+    path.join(cwd, 'api', 'public'),
   ];
   for (const dir of candidates) {
     try {

@@ -7,7 +7,7 @@ Roda na **Vercel** (com Postgres) ou localmente (com SQLite, sem dependências).
 
 ```
 server.mjs        servidor HTTP local (node server.mjs)
-api/index.js      função serverless da Vercel
+api/index.mjs      função serverless da Vercel
 lib/app.mjs       núcleo do app: rotas + regras de acesso (compartilhado)
 lib/db.mjs        banco: SQLite (local) ou Postgres (Vercel) — mesma API
 lib/auth.mjs      hash scrypt, sessões em cookie, trava anti-força bruta
@@ -101,7 +101,7 @@ vercel link          # conecta ao projeto
 vercel deploy --prod
 ```
 
-O `vercel.json` já está pronto: a função em `api/index.js` atende a API, a
+O `vercel.json` já está pronto: a função em `api/index.mjs` atende a API, a
 tela de login e o jogo protegido, e o `public/` é servido como estático.
 
 ### Como o roteamento funciona
@@ -128,7 +128,7 @@ Causa mais comum: **`includeFiles` como array**. O schema da documentação most
 array, mas o build real exige **string**:
 
 ```
-Invalid vercel.json - `functions['api/index.js'].includeFiles` should be string.
+Invalid vercel.json - `functions['api/index.mjs'].includeFiles` should be string.
 ```
 
 O certo é `"includeFiles": "public/**"`. O teste `test/vercel-json.mjs` valida
@@ -140,7 +140,7 @@ Outras causas de build falhar:
 |---|---|---|
 | `includeFiles should be string` | array no `vercel.json` | use string: `"public/**"` |
 | `invalid semver range` no `engines` | `engines.node` divergindo do Project Settings | remova o `engines` do `package.json` |
-| `Using server.mjs as the root entrypoint` | `package.json` com `"main": "server.mjs"` | remova o `"main"` — quem responde na Vercel é `api/index.js` |
+| `Using server.mjs as the root entrypoint` | `package.json` com `"main": "server.mjs"` | remova o `"main"` — quem responde na Vercel é `api/index.mjs` |
 
 ### "500 FUNCTION_INVOCATION_FAILED"
 
@@ -177,7 +177,7 @@ Configure o Postgres — a tela de login mostra um aviso amarelo nesse caso.
 
 ### O deploy não(build) falha
 
-Confira se o `package.json` tem `"type": "module"` e se `api/index.js` está
+Confira se o `package.json` tem `"type": "module"` e se `api/index.mjs` está
 na raiz. O `vercel.json` não deve ter `buildCommand` (não há build).
 
 1. **Primeiro acesso**: o navegador mostra "crie a conta do dono" (seu nome,

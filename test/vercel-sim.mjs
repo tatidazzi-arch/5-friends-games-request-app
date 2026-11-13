@@ -18,7 +18,7 @@ import os from 'node:os';
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-vercel-'));
 process.env.DATA_DIR = DATA_DIR;
 
-const { default: handler } = await import('../api/index.js');
+const { default: handler } = await import('../api/index.mjs');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
