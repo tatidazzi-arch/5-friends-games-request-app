@@ -4,13 +4,10 @@
   "version": "1.0.0",
   "description": "Portal de acesso: senha mestra do dono + contas de acesso para os amigos",
   "type": "module",
-  "engines": {
-    "node": "24.x"
-  },
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
-    "test": "node test/local-sim.mjs && node test/vercel-sim.mjs && node test/pg-adapter.mjs && node test/vercel-env.mjs && node test/bundle-check.mjs",
+    "test": "node test/local-sim.mjs && node test/vercel-sim.mjs && node test/pg-adapter.mjs && node test/vercel-env.mjs && node test/bundle-check.mjs && node test/vercel-json.mjs",
     "check:deploy": "node verificar-deploy.mjs",
     "vercel:dev": "vercel dev",
     "deploy": "vercel deploy --prod"

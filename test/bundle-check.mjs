@@ -50,8 +50,9 @@ for (const f of fs.readdirSync(path.join(ROOT, 'lib'))) {
 const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
 const fn = vercel.functions?.['api/index.js'] ?? {};
 check('vercel.json tem functions api/index.js', !!fn);
+// o build da Vercel exige includeFiles como STRING (array quebra o deploy)
 check('includeFiles inclui public/**',
-  Array.isArray(fn.includeFiles) && fn.includeFiles.some((p) => p.includes('public')),
+  typeof fn.includeFiles === 'string' && fn.includeFiles.includes('public'),
   JSON.stringify(fn.includeFiles));
 
 // 5. os rewrites carregam o caminho original
@@ -61,8 +62,10 @@ check('todos os rewrites passam __path', allHavePath, JSON.stringify(rewrites));
 check('rewrite da API existe', rewrites.some((r) => r.source === '/api/(.*)'));
 check('rewrite do /login existe', rewrites.some((r) => r.source === '/login'));
 
-// 6. outputDirectory aponta para public/
-check('outputDirectory = public', vercel.outputDirectory === 'public', vercel.outputDirectory);
+// 6. outputDirectory: não usamos (a função serve o public/ via includeFiles).
+//    "public" como outputDirectory conflita com a pasta api/ na Vercel.
+check('outputDirectory não é usado (a função serve o public/)',
+  vercel.outputDirectory === undefined, String(vercel.outputDirectory));
 
 // 7. package.json tem o pg (Postgres na Vercel)
 // no repo do jogo o package.json é o do jogo (sem pg) — o teste do bundle
@@ -81,8 +84,11 @@ if (temPkg) {
   check('package.json NÃO declara "main"',
     pkg.main === undefined, `main=${pkg.main}`);
   check('package.json declara "type": "module"', pkg.type === 'module', pkg.type);
-  check('engines fixado (sem range que auto-upgrade)', /^\d+\.x$/.test(pkg.engines?.node ?? ''),
-    pkg.engines?.node);
+  // "engines" NÃO pode ser fixado: se divergir da versão em Project Settings,
+  // a Vercel falha o build ("incompatible with the version configured in
+  // Project Settings"). Sem engines, ela usa a do projeto.
+  check('package.json NÃO fixa "engines"',
+    pkg.engines === undefined, JSON.stringify(pkg.engines));
 }
 
 // 8. o .gitignore protege o data/
