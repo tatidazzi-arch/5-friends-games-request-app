@@ -122,6 +122,26 @@ vercel dev           # sobe localmente com o mesmo roteamento da Vercel
 
 ## Troubleshooting
 
+### O build falha na Vercel
+
+Causa mais comum: **`includeFiles` como array**. O schema da documentação mostra
+array, mas o build real exige **string**:
+
+```
+Invalid vercel.json - `functions['api/index.js'].includeFiles` should be string.
+```
+
+O certo é `"includeFiles": "public/**"`. O teste `test/vercel-json.mjs` valida
+isso (e outras regras) antes do deploy.
+
+Outras causas de build falhar:
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| `includeFiles should be string` | array no `vercel.json` | use string: `"public/**"` |
+| `invalid semver range` no `engines` | `engines.node` divergindo do Project Settings | remova o `engines` do `package.json` |
+| `Using server.mjs as the root entrypoint` | `package.json` com `"main": "server.mjs"` | remova o `"main"` — quem responde na Vercel é `api/index.js` |
+
 ### "500 FUNCTION_INVOCATION_FAILED"
 
 A função não conseguiu iniciar. Descubra o motivo em `/api/health` (ela responde
