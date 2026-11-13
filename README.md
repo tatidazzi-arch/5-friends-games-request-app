@@ -76,7 +76,19 @@ https://SEU-PROJETO.vercel.app/api/health
 A resposta mostra o backend em uso, se a `POSTGRES_URL` foi lida e a versão do
 Node. Se der `503`, o campo `detalhe` diz exatamente o que falhou.
 
-### 2c. Se aparecer "500 FUNCTION_INVOCATION_FAILED"
+### 2c. Importante: desligar o Deployment Protection
+
+Se o projeto tiver **Vercel Authentication** ligado, o site pede login da
+Vercel para **qualquer pessoa** — inclusive os seus amigos. Isso aparece como
+uma página "Protected deployment" ou um redirect para `vercel.com/login`.
+
+Para desligar:
+
+- **Settings → Deployment Protection → Vercel Authentication** → **Disabled**
+  (ou "Only Preview", se quiser proteger apenas os previews)
+- Se o projeto for de um time, o dono do time precisa permitir isso.
+
+### 2d. Se aparecer "500 FUNCTION_INVOCATION_FAILED"
 
 Quase sempre é a `POSTGRES_URL` (ausente, com senha errada ou banco dormindo).
 Veja a seção **Troubleshooting** abaixo. |
@@ -134,6 +146,9 @@ Duas causas diferentes:
    ligado. Desligue em **Settings → Deployment Protection → Vercel
    Authentication** (ou coloque em "Only Preview"). Sem isso, quem não estiver
    logado na Vercel não consegue acessar o site — inclusive os seus amigos.
+
+   Para confirmar que é isso, a resposta do servidor tem:
+   `"vercel_auth_enabled": true`.
 
 ### As contas somem do nada
 
