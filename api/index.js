@@ -20,11 +20,36 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../lib/app.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
-const PUBLIC_DIR = path.join(ROOT, 'public');
-const GAME_DIST = process.env.GAME_DIST || path.join(ROOT, 'dist');
+
+/**
+ * Acha a pasta public/ onde o arquivo estiver.
+ *
+ * No deploy a Vercel empacota a função e o layout muda (o index.html pode
+ * ficar ao lado do bundle). Por isso testamos vários lugares em vez de
+ * assumir um caminho fixo — se nenhum existir, a função ainda funciona:
+ * a camada estática da Vercel serve o index.html em "/".
+ */
+function resolvePublicDir() {
+  const candidates = [
+    path.join(__dirname, '..', 'public'), // layout do repositório (dev)
+    path.join(process.cwd(), 'public'), // cwd da Vercel
+    path.join(__dirname, 'public'), // public dentro do bundle
+    path.join(process.cwd(), '..', 'public'),
+  ];
+  for (const dir of candidates) {
+    try {
+      if (fs.existsSync(path.join(dir, 'index.html'))) return dir;
+    } catch {
+      /* ignora */
+    }
+  }
+  return candidates[0];
+}
+
+const PUBLIC_DIR = resolvePublicDir();
+const GAME_DIST = process.env.GAME_DIST || path.join(process.cwd(), 'dist');
 // só usado quando não há POSTGRES_URL (na Vercel o Postgres manda)
-const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'acesso.db');
 
 // A app é criada uma vez e reaproveitada entre requisições (cold start).
@@ -45,7 +70,7 @@ function getApp() {
 
 /**
  * Diagnóstico: mostra o que a função está usando (backend, env, etc).
- * Helps a descobrir por que o deploy está dando 500 sem precisar dos logs.
+ * Ajuda a descobrir por que o deploy está dando 500 sem precisar dos logs.
  */
 function diagnose(req, res) {
   const hasPg = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);

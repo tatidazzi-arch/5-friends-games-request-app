@@ -65,14 +65,34 @@ check('rewrite do /login existe', rewrites.some((r) => r.source === '/login'));
 check('outputDirectory = public', vercel.outputDirectory === 'public', vercel.outputDirectory);
 
 // 7. package.json tem o pg (Postgres na Vercel)
-const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-check('pg nas dependências', !!pkg.dependencies?.pg, JSON.stringify(pkg.dependencies));
-check('script de start', pkg.scripts?.start === 'node server.mjs', pkg.scripts?.start);
-check('script de teste', !!pkg.scripts?.test, pkg.scripts?.test);
+// no repo do jogo o package.json é o do jogo (sem pg) — o teste do bundle
+// do portal roda no repo standalone, onde o package.json é o do portal.
+const pkgPath = path.join(ROOT, 'package.json');
+const temPkg = fs.existsSync(pkgPath);
+const pkg = temPkg ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : {};
+if (temPkg) {
+  check('pg nas dependências', !!pkg.dependencies?.pg, JSON.stringify(pkg.dependencies));
+  check('script de start', pkg.scripts?.start === 'node server.mjs', pkg.scripts?.start);
+  check('script de teste', !!pkg.scripts?.test, pkg.scripts?.test);
+
+  // 7b. NÃO pode ter "main": a Vercel usa esse campo como entrypoint da função.
+  //     Se apontar pra server.mjs (servidor HTTP), o build passa mas toda
+  //     requisição dá 500 — foi exatamente o bug do primeiro deploy.
+  check('package.json NÃO declara "main"',
+    pkg.main === undefined, `main=${pkg.main}`);
+  check('package.json declara "type": "module"', pkg.type === 'module', pkg.type);
+  check('engines fixado (sem range que auto-upgrade)', /^\d+\.x$/.test(pkg.engines?.node ?? ''),
+    pkg.engines?.node);
+}
 
 // 8. o .gitignore protege o data/
-const gi = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
-check('.gitignore ignora data/', /^\s*data\//m.test(gi));
+const giPath = path.join(ROOT, '.gitignore');
+if (fs.existsSync(giPath)) {
+  const gi = fs.readFileSync(giPath, 'utf8');
+  check('.gitignore ignora data/', /^\s*data\//m.test(gi));
+} else {
+  console.log('  (sem .gitignore local: o repo do jogo protege o data/ na raiz)');
+}
 
 // 9. nenhum arquivo com senha no bundle
 const suspicious = [];
@@ -81,6 +101,26 @@ for (const f of ['public/app.js', 'public/index.html', 'public/style.css']) {
   if (/cowcow|scrypt\$[A-Za-z0-9+/=]{10,}/.test(code)) suspicious.push(f);
 }
 check('sem senha hardcoded no frontend', suspicious.length === 0, suspicious.join(', '));
+
+// 10. a função da Vercel precisa EXPORTA um handler
+//     (se a Vercel rodar server.mjs como função, não há handler e dá 500)
+const apiSrc = fs.readFileSync(apiFile, 'utf8');
+check('api/index.js exporta handler default',
+  /export\s+default\s+(async\s+)?function/.test(apiSrc) || /export\s+default\s+\w+/.test(apiSrc));
+
+// 11. server.mjs NÃO pode exportar handler (é o servidor local)
+const serverSrc = fs.readFileSync(path.join(ROOT, 'server.mjs'), 'utf8');
+check('server.mjs não exporta handler (evita confusão de entrypoint)',
+  !/export\s+default\s+(async\s+)?function\s+handler/.test(serverSrc));
+check('server.mjs abre servidor HTTP', serverSrc.includes('server.listen'));
+
+// 12. simula o build da Vercel: qual arquivo vira a função?
+//     A Vercel usa api/index.js se a pasta api/ existir.
+const temApi = fs.existsSync(path.join(ROOT, 'api', 'index.js'));
+check('pasta api/ existe (a Vercel cria a função a partir dela)', temApi);
+if (temPkg) {
+  check('a função não depende de "main" do package.json', pkg.main === undefined);
+}
 
 console.log(`\nRESULTADO: ${pass} passaram, ${fail} falharam\n`);
 process.exit(fail ? 1 : 0);

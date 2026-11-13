@@ -58,3 +58,9 @@ server.listen(PORT, HOST, () => {
   if (!app.hasGame) console.log('     (sem build do jogo: rode npm run build para habilitar /jogo)');
   console.log('');
 });
+
+// ATENÇÃO: este arquivo é o servidor LOCAL (node server.mjs).
+// Na Vercel quem responde é api/index.js (função serverless).
+// Se a Vercel tentar rodar este arquivo como função, ela não tem um
+// handler para exportar e o deploy dá 500 — por isso o package.json
+// NÃO declara "main": "server.mjs".
